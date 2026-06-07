@@ -10,14 +10,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import useStore from '../store/useStore';
 
-export default function DashboardScreen() {
+export default function DashboardScreen({ navigation }) {
   const profil = useStore((state) => state.profil);
   const objectifs = useStore((state) => state.objectifs);
   const journee = useStore((state) => state.journee);
   const ajouterEau = useStore((state) => state.ajouterEau);
 
-  const pctCalories = Math.min(Math.round((journee.caloriesConsommees / objectifs.calories) * 100), 100);
-  const pctEau = Math.min(Math.round((journee.eauConsommee / objectifs.hydratation) * 100), 100);
+  const pctCalories = Math.min(Math.round((journee.caloriesConsommees / (objectifs.calories || 1)) * 100), 100);
+  const pctEau = Math.min(Math.round((journee.eauConsommee / (objectifs.hydratation || 1)) * 100), 100);
 
   const joursMap = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   const jourActuel = joursMap[new Date().getDay()];
@@ -46,9 +46,12 @@ export default function DashboardScreen() {
               <Text style={styles.nomTxt}>{profil.nom}</Text>
             </View>
           </View>
-          <View style={styles.badgePoids}>
-            <Text style={styles.badgePoidsText}>{profil.poids} kg</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.settingsBtn}
+            onPress={() => navigation.navigate('Parametres')}
+          >
+            <Ionicons name="settings-outline" size={20} color="#888" />
+          </TouchableOpacity>
         </View>
 
         {/* Carte hero calories */}
@@ -74,11 +77,13 @@ export default function DashboardScreen() {
             { label: 'Lipides', val: journee.lipidesConsommes, obj: objectifs.lipides, unite: 'g', couleur: '#2196F3' },
           ].map((m) => (
             <View key={m.label} style={styles.carteMacro}>
-              <Text style={[styles.macroVal, { color: m.couleur }]}>{m.val}<Text style={styles.macroUnite}>{m.unite}</Text></Text>
+              <Text style={[styles.macroVal, { color: m.couleur }]}>
+                {m.val}<Text style={styles.macroUnite}>{m.unite}</Text>
+              </Text>
               <Text style={styles.macroLabel}>{m.label}</Text>
               <View style={styles.macroBarreContainer}>
                 <View style={[styles.macroBarre, {
-                  width: `${Math.min(Math.round((m.val / m.obj) * 100), 100)}%`,
+                  width: `${Math.min(Math.round((m.val / (m.obj || 1)) * 100), 100)}%`,
                   backgroundColor: m.couleur,
                 }]} />
               </View>
@@ -93,7 +98,9 @@ export default function DashboardScreen() {
           <View style={styles.carteRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.carteLabel}>Hydratation</Text>
-              <Text style={styles.carteValeur}>{journee.eauConsommee} <Text style={styles.carteUnite}>ml</Text></Text>
+              <Text style={styles.carteValeur}>
+                {journee.eauConsommee} <Text style={styles.carteUnite}>ml</Text>
+              </Text>
               <Text style={styles.carteObj}>/ {objectifs.hydratation} ml</Text>
             </View>
             <TouchableOpacity style={styles.boutonEau} onPress={() => ajouterEau(250)}>
@@ -124,7 +131,7 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#0d0d0d' },
-  content: { padding: 16, paddingBottom: 40 },
+  content: { padding: 16, paddingBottom: 120 },
 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 8 },
   avatarContainer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -136,31 +143,20 @@ const styles = StyleSheet.create({
   },
   bonjourTxt: { fontSize: 12, color: '#555' },
   nomTxt: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
-  badgePoids: {
-    backgroundColor: 'rgba(76,175,80,0.1)',
-    borderWidth: 1, borderColor: 'rgba(76,175,80,0.2)',
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
+  settingsBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: 'rgba(26,26,26,0.8)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  badgePoidsText: { color: '#4CAF50', fontWeight: '700', fontSize: 14 },
 
   carteHero: {
-    backgroundColor: 'rgba(26,26,26,0.8)',
-    borderRadius: 24, padding: 22, marginBottom: 12,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    overflow: 'hidden',
+    backgroundColor: 'rgba(26,26,26,0.8)', borderRadius: 24, padding: 22, marginBottom: 12,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', overflow: 'hidden',
   },
-  glowVert: {
-    position: 'absolute', width: 160, height: 160, borderRadius: 80,
-    backgroundColor: '#4CAF50', opacity: 0.08, top: -50, right: -40,
-  },
-  glowVert2: {
-    position: 'absolute', width: 120, height: 120, borderRadius: 60,
-    backgroundColor: '#4CAF50', opacity: 0.07, top: -30, right: -30,
-  },
-  glowBleu: {
-    position: 'absolute', width: 120, height: 120, borderRadius: 60,
-    backgroundColor: '#2196F3', opacity: 0.08, top: -30, right: -30,
-  },
+  glowVert: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: '#4CAF50', opacity: 0.08, top: -50, right: -40 },
+  glowVert2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#4CAF50', opacity: 0.07, top: -30, right: -30 },
+  glowBleu: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#2196F3', opacity: 0.08, top: -30, right: -30 },
   heroBadge: { fontSize: 11, color: '#4CAF50', letterSpacing: 1, fontWeight: '700', marginBottom: 8 },
   heroValeur: { fontSize: 56, fontWeight: '900', color: '#fff', letterSpacing: -2, lineHeight: 60 },
   heroUnite: { fontSize: 13, color: '#555', marginBottom: 18, marginTop: 4 },
@@ -172,9 +168,7 @@ const styles = StyleSheet.create({
 
   ligne: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   carteMacro: {
-    flex: 1,
-    backgroundColor: 'rgba(26,26,26,0.8)',
-    borderRadius: 20, padding: 14,
+    flex: 1, backgroundColor: 'rgba(26,26,26,0.8)', borderRadius: 20, padding: 14,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
   },
   macroVal: { fontSize: 18, fontWeight: '800' },
@@ -185,10 +179,8 @@ const styles = StyleSheet.create({
   macroObj: { fontSize: 10, color: '#444', marginTop: 4 },
 
   carte: {
-    backgroundColor: 'rgba(26,26,26,0.8)',
-    borderRadius: 24, padding: 20, marginBottom: 12,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-    overflow: 'hidden',
+    backgroundColor: 'rgba(26,26,26,0.8)', borderRadius: 24, padding: 20, marginBottom: 12,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', overflow: 'hidden',
   },
   carteRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   carteLabel: { fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
@@ -206,8 +198,8 @@ const styles = StyleSheet.create({
   seanceJour: { fontSize: 24, fontWeight: '800', color: '#fff', marginTop: 4 },
   seanceMuscles: { fontSize: 14, color: '#555', marginTop: 4, marginBottom: 12 },
   seanceBadge: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start',
   },
   seanceBadgeTxt: { color: '#555', fontSize: 12 },
 });
