@@ -12,32 +12,33 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import useStore from '../store/useStore';
-
 import {
   planifierRappelsHydratation,
   planifierRappelSeance,
   planifierBilanJournalier,
   annulerNotifications,
+  testerNotificationImmediате,
 } from '../services/notifications';
 import { exporterBilanSemaine } from '../services/export';
 
 export default function ParametresScreen({ onFermer }) {
   const profil = useStore((state) => state.profil);
-  const journee = useStore((state) => state.journee);
   const objectifs = useStore((state) => state.objectifs);
+  const journee = useStore((state) => state.journee);
+  const repas = useStore((state) => state.repas);
+  const historiquePoids = useStore((state) => state.historiquePoids);
   const setProfil = useStore((state) => state.setProfil);
   const resetJournee = useStore((state) => state.resetJournee);
   const notificationsActives = useStore((state) => state.notificationsActives);
   const setNotificationsActives = useStore((state) => state.setNotificationsActives);
-  const repas = useStore((state) => state.repas);
-  const historiquePoids = useStore((state) => state.historiquePoids);
-  const [exportEnCours, setExportEnCours] = useState(false);
+
   const [nom, setNom] = useState(profil.nom);
   const [poids, setPoids] = useState(profil.poids);
   const [taille, setTaille] = useState(profil.taille);
   const [age, setAge] = useState(profil.age);
   const [niveau, setNiveau] = useState(profil.niveau);
   const [modifie, setModifie] = useState(false);
+  const [exportEnCours, setExportEnCours] = useState(false);
 
   const niveaux = [
     { label: 'Debutant', value: 'debutant' },
@@ -56,37 +57,54 @@ export default function ParametresScreen({ onFermer }) {
   };
 
   const handleReset = () => {
-  Alert.alert(
-    'Reset journee',
-    'Remettre tous les compteurs du jour a zero ?',
-    [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Confirmer', style: 'destructive', onPress: () => resetJournee() },
-    ]
-  );
-};
+    Alert.alert(
+      'Reset journee',
+      'Remettre tous les compteurs du jour a zero ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Confirmer', style: 'destructive', onPress: () => resetJournee() },
+      ]
+    );
+  };
 
-const handleToggleNotification = async (cle, valeur) => {
-  setNotificationsActives(cle, valeur);
-  if (valeur) {
-    if (cle === 'hydratation') await planifierRappelsHydratation();
-    if (cle === 'seance') await planifierRappelSeance([1, 2, 4, 5, 6]);
-    if (cle === 'bilan') await planifierBilanJournalier();
-  } else {
-    await annulerNotifications(cle);
-  }
-};
+  const handleToggleNotification = async (cle, valeur) => {
+    setNotificationsActives(cle, valeur);
+    try {
+      if (valeur) {
+        if (cle === 'hydratation') await planifierRappelsHydratation();
+        if (cle === 'seance') await planifierRappelSeance();
+        if (cle === 'bilan') await planifierBilanJournalier();
+      } else {
+        await annulerNotifications(cle);
+      }
+    } catch (e) {
+      Alert.alert('Erreur notifications', e.message);
+    }
+  };
 
-const handleExporter = async () => {
-  setExportEnCours(true);
-  try {
-    await exporterBilanSemaine({ profil, objectifs, journee, repas, historiquePoids });
-  } catch (e) {
-    Alert.alert('Erreur détaillée', e.message || JSON.stringify(e));
-  } finally {
-    setExportEnCours(false);
-  }
-};
+  const handleTesterNotification = async () => {
+    try {
+      const ok = await testerNotificationImmediате();
+      if (ok) {
+        Alert.alert('Test envoyé', 'Mets l\'app en arrière-plan, tu recevras une notification dans 3 secondes.');
+      } else {
+        Alert.alert('Permission refusée', 'Active les notifications dans les réglages iOS.');
+      }
+    } catch (e) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
+  const handleExporter = async () => {
+    setExportEnCours(true);
+    try {
+      await exporterBilanSemaine({ profil, objectifs, journee, repas, historiquePoids });
+    } catch (e) {
+      Alert.alert('Erreur', e.message || 'Impossible d\'exporter le bilan.');
+    } finally {
+      setExportEnCours(false);
+    }
+  };
 
   const marquerModifie = (fn) => (...args) => {
     fn(...args);
@@ -173,7 +191,7 @@ const handleExporter = async () => {
           )}
         </View>
 
-        {/* Objectifs recalculés */}
+        {/* Objectifs */}
         <View style={styles.carte}>
           <Text style={styles.carteLabel}>Objectifs actuels</Text>
           {[
@@ -185,7 +203,9 @@ const handleExporter = async () => {
           ].map((o) => (
             <View key={o.label} style={styles.objectifLigne}>
               <Text style={styles.objectifLabel}>{o.label}</Text>
-              <Text style={[styles.objectifVal, { color: o.couleur }]}>{o.val} <Text style={styles.objectifUnite}>{o.unite}</Text></Text>
+              <Text style={[styles.objectifVal, { color: o.couleur }]}>
+                {o.val} <Text style={styles.objectifUnite}>{o.unite}</Text>
+              </Text>
             </View>
           ))}
         </View>
@@ -194,9 +214,9 @@ const handleExporter = async () => {
         <View style={styles.carte}>
           <Text style={styles.carteLabel}>Notifications</Text>
           {[
-            { label: 'Rappels hydratation', desc: 'Toutes les 2h', cle: 'hydratation' },
-            { label: 'Rappel séance', desc: 'Le jour de ta seance', cle: 'seance' },
-            { label: 'Bilan journalier', desc: 'Chaque soir a 20h', cle: 'bilan' },
+            { label: 'Rappels hydratation', desc: 'Toutes les 2h de 8h à 20h', cle: 'hydratation' },
+            { label: 'Rappel séance', desc: 'Les jours d\'entrainement à 9h', cle: 'seance' },
+            { label: 'Bilan journalier', desc: 'Chaque soir à 20h', cle: 'bilan' },
           ].map((n) => (
             <View key={n.cle} style={styles.notifLigne}>
               <View style={{ flex: 1 }}>
@@ -211,13 +231,19 @@ const handleExporter = async () => {
               />
             </View>
           ))}
+
+          {/* Bouton test */}
+          <TouchableOpacity style={styles.boutonTest} onPress={handleTesterNotification}>
+            <Ionicons name="notifications-outline" size={16} color="#FF9800" />
+            <Text style={styles.boutonTestTxt}>Tester une notification</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Actions */}
         <View style={styles.carte}>
           <Text style={styles.carteLabel}>Actions</Text>
           <TouchableOpacity style={styles.actionLigne} onPress={handleReset}>
-            <View style={styles.actionIcone}>
+            <View style={[styles.actionIcone, { backgroundColor: 'rgba(255,152,0,0.1)' }]}>
               <Ionicons name="refresh-outline" size={18} color="#FF9800" />
             </View>
             <View style={{ flex: 1 }}>
@@ -226,20 +252,21 @@ const handleExporter = async () => {
             </View>
             <Ionicons name="chevron-forward" size={16} color="#333" />
           </TouchableOpacity>
-        </View>
-        <View style={styles.separateur} />
-            <TouchableOpacity style={styles.actionLigne} onPress={handleExporter} disabled={exportEnCours}>
-            <View style={[styles.actionIcone, { backgroundColor: 'rgba(76,175,80,0.1)' }]}>
-            <Ionicons name="share-outline" size={18} color="#4CAF50" />
-        </View>
-        <View style={{ flex: 1 }}>
-            <Text style={styles.actionLabel}>{exportEnCours ? 'Export en cours...' : 'Exporter mon bilan'}</Text>
-            <Text style={styles.actionDesc}>Partager un résumé de ta journée</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color="#333" />
-        </TouchableOpacity>
 
-        {/* Version */}
+          <View style={styles.separateur} />
+
+          <TouchableOpacity style={styles.actionLigne} onPress={handleExporter} disabled={exportEnCours}>
+            <View style={[styles.actionIcone, { backgroundColor: 'rgba(76,175,80,0.1)' }]}>
+              <Ionicons name="share-outline" size={18} color="#4CAF50" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.actionLabel}>{exportEnCours ? 'Export en cours...' : 'Exporter mon bilan'}</Text>
+              <Text style={styles.actionDesc}>Partager un résumé de ta journée</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#333" />
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.version}>MassUp v1.0.0</Text>
 
       </ScrollView>
@@ -272,8 +299,6 @@ const styles = StyleSheet.create({
   niveauTxt: { color: '#555', fontSize: 12, fontWeight: '600' },
   niveauTxtActif: { color: '#fff' },
 
-  separateur: { height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginVertical: 8 },
-
   boutonSauvegarder: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: '#4CAF50', borderRadius: 14, padding: 14, marginTop: 20,
@@ -289,10 +314,18 @@ const styles = StyleSheet.create({
   notifLabel: { color: '#fff', fontSize: 14, fontWeight: '600' },
   notifDesc: { color: '#555', fontSize: 12, marginTop: 2 },
 
+  boutonTest: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: 'rgba(255,152,0,0.08)', borderWidth: 1, borderColor: 'rgba(255,152,0,0.2)',
+    borderRadius: 12, padding: 12, marginTop: 14,
+  },
+  boutonTestTxt: { color: '#FF9800', fontSize: 13, fontWeight: '700' },
+
   actionLigne: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
-  actionIcone: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,152,0,0.1)', justifyContent: 'center', alignItems: 'center' },
+  actionIcone: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   actionLabel: { color: '#fff', fontSize: 14, fontWeight: '600' },
   actionDesc: { color: '#555', fontSize: 12, marginTop: 2 },
+  separateur: { height: 1, backgroundColor: 'rgba(255,255,255,0.04)', marginVertical: 12 },
 
   version: { color: '#333', fontSize: 12, textAlign: 'center', marginTop: 8 },
 });
