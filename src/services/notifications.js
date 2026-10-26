@@ -1,30 +1,42 @@
 import * as Notifications from 'expo-notifications';
 
+const REST_ID = 'rest_timer';
+
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    // The rest timer already alerts inside the app, so only show it in the background.
+    const isRest = notification.request.identifier === REST_ID;
+    return {
+      shouldShowBanner: !isRest,
+      shouldShowList: !isRest,
+      shouldPlaySound: !isRest,
+      shouldSetBadge: false,
+    };
+  },
 });
 
-export async function demanderPermissions() {
-  const { status: existant } = await Notifications.getPermissionsAsync();
-  if (existant === 'granted') return true;
+export async function requestPermissions() {
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  if (existing === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync();
   return status === 'granted';
 }
 
-export async function testerNotificationImmediате() {
-  const autorise = await demanderPermissions();
-  if (!autorise) return false;
+export async function cancelNotifications(prefix) {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of scheduled) {
+    if (n.identifier.startsWith(prefix)) {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+}
+
+export async function sendTestNotification() {
+  if (!(await requestPermissions())) return false;
   await Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'MassUp',
-      body: 'Les notifications fonctionnent correctement.',
-    },
+    content: { title: 'MassUp', body: 'Notifications are working.' },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: 3,
       repeats: false,
     },
@@ -32,22 +44,16 @@ export async function testerNotificationImmediате() {
   return true;
 }
 
-export async function planifierRappelsHydratation() {
-  await annulerNotifications('hydratation');
-  const autorise = await demanderPermissions();
-  if (!autorise) return false;
-
-  const heures = [8, 10, 12, 14, 16, 18, 20];
-  for (const heure of heures) {
+export async function scheduleHydrationReminders() {
+  await cancelNotifications('hydration');
+  if (!(await requestPermissions())) return false;
+  for (const hour of [8, 10, 12, 14, 16, 18, 20]) {
     await Notifications.scheduleNotificationAsync({
-      identifier: `hydratation_${heure}`,
-      content: {
-        title: 'Hydratation',
-        body: "N'oublie pas de boire de l'eau pour rester performant.",
-      },
+      identifier: `hydration_${hour}`,
+      content: { title: 'Hydration', body: 'Time for some water to stay at your best.' },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: heure,
+        hour,
         minute: 0,
       },
     });
@@ -55,41 +61,12 @@ export async function planifierRappelsHydratation() {
   return true;
 }
 
-export async function planifierRappelSeance() {
-  await annulerNotifications('seance');
-  const autorise = await demanderPermissions();
-  if (!autorise) return false;
-
-  const jours = [2, 3, 5, 6, 7];
-  for (const jour of jours) {
-    await Notifications.scheduleNotificationAsync({
-      identifier: `seance_${jour}`,
-      content: {
-        title: 'Seance du jour',
-        body: "C'est l'heure de t'entrainer. Tu peux le faire !",
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-        weekday: jour,
-        hour: 9,
-        minute: 0,
-      },
-    });
-  }
-  return true;
-}
-
-export async function planifierBilanJournalier() {
-  await annulerNotifications('bilan');
-  const autorise = await demanderPermissions();
-  if (!autorise) return false;
-
+export async function scheduleDailyRecap() {
+  await cancelNotifications('recap');
+  if (!(await requestPermissions())) return false;
   await Notifications.scheduleNotificationAsync({
-    identifier: 'bilan_soir',
-    content: {
-      title: 'Bilan du jour',
-      body: "As-tu atteint tes objectifs aujourd'hui ? Vérifie ton bilan.",
-    },
+    identifier: 'recap_evening',
+    content: { title: 'Daily recap', body: 'Did you hit your targets today? Check your progress.' },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour: 20,
@@ -99,11 +76,41 @@ export async function planifierBilanJournalier() {
   return true;
 }
 
-export async function annulerNotifications(type) {
-  const planifiees = await Notifications.getAllScheduledNotificationsAsync();
-  for (const notif of planifiees) {
-    if (notif.identifier.startsWith(type)) {
-      await Notifications.cancelScheduledNotificationAsync(notif.identifier);
-    }
+// Rest timer: a notification that fires when the rest ends (useful with the screen locked).
+export async function scheduleRestEnd(seconds) {
+  try {
+    if (!(await requestPermissions())) return false;
+    await Notifications.scheduleNotificationAsync({
+      identifier: REST_ID,
+      content: { title: 'Rest over', body: 'Time for your next set.' },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: Math.max(1, Math.round(seconds)),
+        repeats: false,
+      },
+    });
+    return true;
+  } catch (e) {
+    return false;
   }
+}
+
+export async function cancelRestEnd() {
+  try {
+    await Notifications.cancelScheduledNotificationAsync(REST_ID);
+  } catch (e) {
+    // nothing scheduled
+  }
+}
+
+// Removes reminders scheduled by older versions (French text, session reminders)
+// and re-creates the enabled ones in English. Never prompts for permission.
+export async function syncNotifications(enabled) {
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return;
+  for (const prefix of ['hydratation', 'seance', 'bilan', 'hydration', 'recap']) {
+    await cancelNotifications(prefix);
+  }
+  if (enabled.hydration) await scheduleHydrationReminders();
+  if (enabled.recap) await scheduleDailyRecap();
 }

@@ -1,243 +1,127 @@
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  TouchableOpacity,
-  ScrollView,
-  Animated,
-  Dimensions,
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const { width } = Dimensions.get('window');
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Glow, PrimaryButton } from '../components/ui';
+import { colors } from '../theme';
 
 const SLIDES = [
   {
-    id: 1,
-    icone: 'barbell-outline',
-    couleur: '#4CAF50',
-    titre: 'Bienvenue sur MassUp',
-    description: 'Ton compagnon prise de masse conçu pour les sportifs africains. Simple, efficace, sans salle de sport.',
+    icon: 'barbell-outline',
+    color: colors.teal,
+    title: 'Welcome to\nMassUp',
+    text: 'Your bulking companion. Simple, focused and built around the food you actually eat.',
   },
   {
-    id: 2,
-    icone: 'restaurant-outline',
-    couleur: '#FF9800',
-    titre: 'Alimentation locale',
-    description: 'Suis tes macros avec une base d\'aliments ivoiriens et africains. Attieké, garba, foutou — tout y est.',
+    icon: 'restaurant-outline',
+    color: colors.carbs,
+    title: 'Eat local,\ntrack easily',
+    text: 'Log meals from a food list that includes attiéké, garba, foutou, chicken fried rice and more.',
   },
   {
-    id: 3,
-    icone: 'water-outline',
-    couleur: '#2196F3',
-    titre: 'Hydratation intelligente',
-    description: 'Ton objectif d\'eau est calculé selon ton poids. Des rappels te gardent hydraté tout au long de la journée.',
+    icon: 'water-outline',
+    color: colors.water,
+    title: 'Smart\nhydration',
+    text: 'Your water goal is based on your weight, with optional reminders through the day.',
   },
   {
-    id: 4,
-    icone: 'trending-up-outline',
-    couleur: '#9C27B0',
-    titre: 'Suis tes progrès',
-    description: 'Graphique de poids, bilan journalier, objectifs atteints. Vois ta progression semaine après semaine.',
+    icon: 'timer-outline',
+    color: colors.teal,
+    title: 'Rest timer for\nevery set',
+    text: 'Train your own way. Pick a rest from 1:30 to 3:00 and we will tell you when it is over.',
   },
   {
-    id: 5,
-    icone: 'person-outline',
-    couleur: '#4CAF50',
-    titre: 'Prêt à prendre de la masse ?',
-    description: 'Crée ton profil en 30 secondes. Tes objectifs caloriques et tes macros sont calculés automatiquement.',
+    icon: 'stats-chart-outline',
+    color: colors.fat,
+    title: 'See your\nprogress',
+    text: 'Weight chart, daily report and targets. Watch your progress build week after week.',
   },
 ];
 
-export default function OnboardingScreen({ onTermine }) {
-  const [slideActif, setSlideActif] = useState(0);
-  const scrollRef = useRef(null);
-  const animScale = useRef(new Animated.Value(1)).current;
+export default function OnboardingScreen({ onDone }) {
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [index, setIndex] = useState(0);
+  const ref = useRef(null);
+  const last = index === SLIDES.length - 1;
 
-  const allerSlide = (index) => {
-    scrollRef.current?.scrollTo({ x: index * width, animated: true });
-    setSlideActif(index);
+  const go = (i) => {
+    ref.current?.scrollTo({ x: i * width, animated: true });
+    setIndex(i);
   };
 
-  const handleSuivant = () => {
-    if (slideActif < SLIDES.length - 1) {
-      allerSlide(slideActif + 1);
-    }
-  };
-
-  const handleCommencer = async () => {
-    Animated.sequence([
-      Animated.timing(animScale, { toValue: 0.95, duration: 100, useNativeDriver: true }),
-      Animated.timing(animScale, { toValue: 1, duration: 100, useNativeDriver: true }),
-    ]).start(async () => {
+  const finish = async () => {
+    try {
       await AsyncStorage.setItem('massup_onboarding', 'done');
-      onTermine();
-    });
+    } catch (e) {
+      console.error(e);
+    }
+    onDone();
   };
-
-  const estDernier = slideActif === SLIDES.length - 1;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Glow size={460} color={SLIDES[index].color} opacity={0.22} style={{ top: -120, alignSelf: 'center' }} />
 
-      {/* Bouton passer */}
-      {!estDernier && (
-        <TouchableOpacity style={styles.passerBtn} onPress={handleCommencer}>
-          <Text style={styles.passerTxt}>Passer</Text>
-        </TouchableOpacity>
-      )}
+      <View style={[s.top, { paddingTop: insets.top + 12 }]}>
+        {!last && (
+          <Pressable onPress={finish} hitSlop={10}>
+            <Text style={s.skip}>Skip</Text>
+          </Pressable>
+        )}
+      </View>
 
-      {/* Slides */}
       <ScrollView
-        ref={scrollRef}
+        ref={ref}
         horizontal
         pagingEnabled
-        showsHorizontalScrollIndicator={false}
         scrollEnabled={false}
-        style={styles.scrollView}
+        showsHorizontalScrollIndicator={false}
+        style={{ flex: 1 }}
       >
-        {SLIDES.map((slide, index) => (
-          <View key={slide.id} style={styles.slide}>
-
-            {/* Illustration */}
-            <View style={styles.illustrationContainer}>
-              <View style={[styles.cercleExterne, { borderColor: `${slide.couleur}20` }]} />
-              <View style={[styles.cercleMoyen, { borderColor: `${slide.couleur}30` }]} />
-              <View style={[styles.cercleInterne, { backgroundColor: `${slide.couleur}15`, borderColor: `${slide.couleur}25` }]}>
-                <View style={[styles.glowCentre, { backgroundColor: slide.couleur }]} />
-                <Ionicons name={slide.icone} size={64} color={slide.couleur} />
+        {SLIDES.map((sl) => (
+          <View key={sl.title} style={{ width, paddingHorizontal: 28, justifyContent: 'center' }}>
+            <View style={s.art}>
+              <View style={[s.ring, { width: 250, height: 250, borderRadius: 125, borderColor: `${sl.color}22` }]} />
+              <View style={[s.ring, { width: 190, height: 190, borderRadius: 95, borderColor: `${sl.color}38` }]} />
+              <View style={[s.core, { backgroundColor: `${sl.color}1A`, borderColor: `${sl.color}55` }]}>
+                <Ionicons name={sl.icon} size={54} color={sl.color} />
               </View>
             </View>
-
-            {/* Texte */}
-            <View style={styles.texteContainer}>
-              <Text style={styles.slideTitre}>{slide.titre}</Text>
-              <Text style={styles.slideDescription}>{slide.description}</Text>
-            </View>
-
+            <Text style={s.title}>{sl.title}</Text>
+            <Text style={s.text}>{sl.text}</Text>
           </View>
         ))}
       </ScrollView>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-
-        {/* Points indicateurs */}
-        <View style={styles.dotsContainer}>
+      <View style={[s.footer, { paddingBottom: insets.bottom + 20 }]}>
+        <View style={s.dots}>
           {SLIDES.map((_, i) => (
-            <TouchableOpacity key={i} onPress={() => allerSlide(i)}>
-              <View style={[
-                styles.dot,
-                slideActif === i && styles.dotActif,
-                slideActif === i && { backgroundColor: SLIDES[i].couleur },
-              ]} />
-            </TouchableOpacity>
+            <Pressable key={i} onPress={() => go(i)} hitSlop={6}>
+              <View style={[s.dot, i === index && { width: 26, backgroundColor: SLIDES[index].color }]} />
+            </Pressable>
           ))}
         </View>
-
-        {/* Bouton action */}
-        {estDernier ? (
-          <Animated.View style={{ transform: [{ scale: animScale }] }}>
-            <TouchableOpacity style={styles.boutonCommencer} onPress={handleCommencer}>
-              <Text style={styles.boutonCommencerTxt}>Créer mon profil</Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
-            </TouchableOpacity>
-          </Animated.View>
-        ) : (
-          <TouchableOpacity style={styles.boutonSuivant} onPress={handleSuivant}>
-            <Text style={styles.boutonSuivantTxt}>Suivant</Text>
-            <Ionicons name="arrow-forward" size={18} color="#4CAF50" />
-          </TouchableOpacity>
-        )}
-
+        <PrimaryButton
+          label={last ? 'Get started' : 'Next'}
+          icon="arrow-forward"
+          onPress={last ? finish : () => go(index + 1)}
+        />
       </View>
-
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0d0d0d' },
-
-  passerBtn: {
-    position: 'absolute', top: 60, right: 24, zIndex: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8,
-  },
-  passerTxt: { color: '#555', fontSize: 13, fontWeight: '600' },
-
-  scrollView: { flex: 1 },
-
-  slide: {
-    width,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-
-  illustrationContainer: {
-    width: 240,
-    height: 240,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 48,
-  },
-  cercleExterne: {
-    position: 'absolute',
-    width: 240, height: 240, borderRadius: 120,
-    borderWidth: 1,
-  },
-  cercleMoyen: {
-    position: 'absolute',
-    width: 190, height: 190, borderRadius: 95,
-    borderWidth: 1,
-  },
-  cercleInterne: {
-    width: 140, height: 140, borderRadius: 70,
-    borderWidth: 1,
-    justifyContent: 'center', alignItems: 'center',
-    overflow: 'hidden',
-  },
-  glowCentre: {
-    position: 'absolute',
-    width: 80, height: 80, borderRadius: 40,
-    opacity: 0.15,
-  },
-
-  texteContainer: { alignItems: 'center' },
-  slideTitre: {
-    fontSize: 28, fontWeight: '900', color: '#fff',
-    textAlign: 'center', letterSpacing: -0.5, marginBottom: 16,
-  },
-  slideDescription: {
-    fontSize: 16, color: '#666', textAlign: 'center',
-    lineHeight: 24,
-  },
-
-  footer: {
-    paddingHorizontal: 24, paddingBottom: 40, paddingTop: 24,
-    gap: 24,
-  },
-
-  dotsContainer: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#2a2a2a' },
-  dotActif: { width: 24, borderRadius: 3 },
-
-  boutonSuivant: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: 'rgba(76,175,80,0.08)',
-    borderWidth: 1, borderColor: 'rgba(76,175,80,0.2)',
-    borderRadius: 16, padding: 18,
-  },
-  boutonSuivantTxt: { color: '#4CAF50', fontWeight: '800', fontSize: 16 },
-
-  boutonCommencer: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#4CAF50', borderRadius: 16, padding: 18,
-  },
-  boutonCommencerTxt: { color: '#fff', fontWeight: '800', fontSize: 16 },
+const s = StyleSheet.create({
+  top: { height: 70, paddingHorizontal: 24, alignItems: 'flex-end', justifyContent: 'center' },
+  skip: { color: colors.textMuted, fontSize: 14, fontWeight: '700' },
+  art: { height: 270, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  ring: { position: 'absolute', borderWidth: 1 },
+  core: { width: 128, height: 128, borderRadius: 64, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  title: { color: colors.text, fontSize: 42, fontWeight: '900', letterSpacing: -1.8, lineHeight: 44, marginBottom: 14 },
+  text: { color: colors.textMuted, fontSize: 16, lineHeight: 24 },
+  footer: { paddingHorizontal: 24, gap: 22 },
+  dots: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.15)' },
 });

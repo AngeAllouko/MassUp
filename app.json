@@ -7,16 +7,19 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "backgroundColor": "#0d0d0d"
+      "backgroundColor": "#05090B"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.massup.app"
+      "bundleIdentifier": "com.massup.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0d0d0d"
+        "backgroundColor": "#05090B"
       },
       "package": "com.massup.app"
     },
@@ -27,9 +30,18 @@
       [
         "expo-notifications",
         {
-          "color": "#4CAF50"
+          "color": "#2DE2D0"
         }
-      ]
-    ]
+      ],
+      "expo-sharing",
+      "expo-font",
+      "expo-splash-screen",
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "96120485-e6bd-4ca9-9eff-1cfbf56ce442"
+      }
+    }
   }
 }

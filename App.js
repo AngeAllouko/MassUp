@@ -1,70 +1,65 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, ActivityIndicator, StyleSheet, Animated, Text } from 'react-native';
+import { View, StyleSheet, Animated, Text } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import AppNavigator from './src/navigation/AppNavigator';
-import ProfilScreen from './src/screens/ProfilScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import { Glow } from './src/components/ui';
+import { syncNotifications } from './src/services/notifications';
 import useStore from './src/store/useStore';
+import { colors } from './src/theme';
 
 SplashScreen.preventAutoHideAsync();
 
-function SplashPersonnalise({ onTermine }) {
-  const opacite = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.8)).current;
-  const opaciteTexte = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
-  const largeurBarre = useRef(new Animated.Value(0)).current;
+function AnimatedSplash({ onDone }) {
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const textY = useRef(new Animated.Value(20)).current;
+  const bar = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.sequence([
-      // Logo apparait
       Animated.parallel([
-        Animated.timing(opacite, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.spring(scale, { toValue: 1, speed: 8, bounciness: 12, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.spring(logoScale, { toValue: 1, speed: 8, bounciness: 12, useNativeDriver: true }),
       ]),
-      // Texte apparait
       Animated.parallel([
-        Animated.timing(opaciteTexte, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(textOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(textY, { toValue: 0, duration: 400, useNativeDriver: true }),
       ]),
-      // Barre se remplit
-      Animated.timing(largeurBarre, { toValue: 1, duration: 900, useNativeDriver: false }),
-      // Pause
+      Animated.timing(bar, { toValue: 1, duration: 900, useNativeDriver: false }),
       Animated.delay(300),
-      // Tout disparait
       Animated.parallel([
-        Animated.timing(opacite, { toValue: 0, duration: 500, useNativeDriver: true }),
-        Animated.timing(opaciteTexte, { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(textOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
       ]),
-    ]).start(() => onTermine());
+    ]).start(() => onDone());
   }, []);
 
   return (
     <View style={splash.container}>
-      <View style={splash.glowHaut} />
-      <View style={splash.glowBas} />
-
-      <Animated.View style={[splash.logoContainer, { opacity: opacite, transform: [{ scale }] }]}>
-        <View style={splash.cerclePrincipal}>
-          <View style={splash.glowCentre} />
-          <Text style={splash.logoIcone}>M</Text>
+      <Glow size={520} opacity={0.3} style={{ top: -140, alignSelf: 'center' }} />
+      <Animated.View style={[splash.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+        <View style={splash.logo}>
+          <Glow size={140} opacity={0.35} style={{ top: -20, left: -20 }} />
+          <Text style={splash.logoTxt}>M</Text>
         </View>
       </Animated.View>
 
-      <Animated.View style={[splash.texteContainer, { opacity: opaciteTexte, transform: [{ translateY }] }]}>
-        <Text style={splash.titre}>MassUp</Text>
-        <Text style={splash.sousTitre}>Ton compagnon prise de masse</Text>
+      <Animated.View style={{ alignItems: 'center', opacity: textOpacity, transform: [{ translateY: textY }] }}>
+        <Text style={splash.title}>MassUp</Text>
+        <Text style={splash.sub}>Your bulking companion</Text>
       </Animated.View>
 
-      <Animated.View style={[splash.barreWrapper, { opacity: opaciteTexte }]}>
-        <View style={splash.barreContainer}>
-          <Animated.View style={[splash.barre, {
-            width: largeurBarre.interpolate({
-              inputRange: [0, 1],
-              outputRange: ['0%', '100%'],
-            }),
-          }]} />
+      <Animated.View style={[splash.barWrap, { opacity: textOpacity }]}>
+        <View style={splash.barTrack}>
+          <Animated.View
+            style={[splash.bar, { width: bar.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
+          />
         </View>
       </Animated.View>
     </View>
@@ -72,89 +67,61 @@ function SplashPersonnalise({ onTermine }) {
 }
 
 export default function App() {
-  const profilComplet = useStore((state) => state.profilComplet);
-  const charger = useStore((state) => state.charger);
-  const [chargement, setChargement] = useState(true);
-  const [splashTermine, setSplashTermine] = useState(false);
-  const [onboardingFait, setOnboardingFait] = useState(false);
+  const profileComplete = useStore((s) => s.profileComplete);
+  const load = useStore((s) => s.load);
+  const [loading, setLoading] = useState(true);
+  const [splashDone, setSplashDone] = useState(false);
+  const [onboarded, setOnboarded] = useState(false);
 
   useEffect(() => {
-    const init = async () => {
+    (async () => {
       try {
-        const onboarding = await AsyncStorage.getItem('massup_onboarding');
-        setOnboardingFait(onboarding === 'done');
-        await charger();
+        setOnboarded((await AsyncStorage.getItem('massup_onboarding')) === 'done');
+        await load();
+        // Clears reminders from older versions and re-creates the enabled ones in English.
+        await syncNotifications(useStore.getState().notificationsEnabled).catch(() => {});
       } catch (e) {
         console.error(e);
       } finally {
         await SplashScreen.hideAsync();
-        setChargement(false);
+        setLoading(false);
       }
-    };
-    init();
+    })();
   }, []);
 
-  useEffect(() => {
-    if (profilComplet) {}
-  }, [profilComplet]);
-
-  // Toujours montrer le splash en premier
-  if (!splashTermine) {
-    return <SplashPersonnalise onTermine={() => setSplashTermine(true)} />;
+  let content;
+  if (!splashDone) {
+    content = <AnimatedSplash onDone={() => setSplashDone(true)} />;
+  } else if (loading) {
+    content = <View style={splash.container} />;
+  } else if (!onboarded) {
+    content = <OnboardingScreen onDone={() => setOnboarded(true)} />;
+  } else if (!profileComplete) {
+    content = <ProfileScreen />;
+  } else {
+    content = <AppNavigator />;
   }
 
-  if (chargement) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
-
-  if (!onboardingFait) {
-    return <OnboardingScreen onTermine={() => setOnboardingFait(true)} />;
-  }
-
-  if (!profilComplet) {
-    return <ProfilScreen />;
-  }
-
-  return <AppNavigator />;
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="light" />
+      {content}
+    </SafeAreaProvider>
+  );
 }
 
 const splash = StyleSheet.create({
-  container: {
-    flex: 1, backgroundColor: '#0d0d0d',
+  container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  logoWrap: { marginBottom: 32 },
+  logo: {
+    width: 104, height: 104, borderRadius: 52, overflow: 'hidden',
+    backgroundColor: colors.tealSoft, borderWidth: 1, borderColor: colors.borderTeal,
     alignItems: 'center', justifyContent: 'center',
   },
-  glowHaut: {
-    position: 'absolute', width: 300, height: 300, borderRadius: 150,
-    backgroundColor: '#4CAF50', opacity: 0.06, top: -80, right: -60,
-  },
-  glowBas: {
-    position: 'absolute', width: 200, height: 200, borderRadius: 100,
-    backgroundColor: '#2196F3', opacity: 0.05, bottom: -40, left: -40,
-  },
-  logoContainer: { marginBottom: 32 },
-  cerclePrincipal: {
-    width: 100, height: 100, borderRadius: 30,
-    backgroundColor: 'rgba(76,175,80,0.12)',
-    borderWidth: 1, borderColor: 'rgba(76,175,80,0.3)',
-    justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
-  },
-  glowCentre: {
-    position: 'absolute', width: 60, height: 60, borderRadius: 30,
-    backgroundColor: '#4CAF50', opacity: 0.15,
-  },
-  logoIcone: { fontSize: 52, fontWeight: '900', color: '#4CAF50', letterSpacing: -2 },
-  texteContainer: { alignItems: 'center', marginBottom: 48 },
-  titre: { fontSize: 36, fontWeight: '900', color: '#fff', letterSpacing: -1, marginBottom: 6 },
-  sousTitre: { fontSize: 14, color: '#555' },
-  barreWrapper: { position: 'absolute', bottom: 80, width: 120 },
-  barreContainer: { height: 3, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' },
-  barre: { height: 3, width: '70%', backgroundColor: '#4CAF50', borderRadius: 2 },
-});
-
-const styles = StyleSheet.create({
-  loading: { flex: 1, backgroundColor: '#0d0d0d', justifyContent: 'center', alignItems: 'center' },
+  logoTxt: { fontSize: 54, fontWeight: '900', color: colors.teal, letterSpacing: -2 },
+  title: { fontSize: 44, fontWeight: '900', color: colors.text, letterSpacing: -2, marginBottom: 6 },
+  sub: { fontSize: 14, color: colors.textMuted },
+  barWrap: { position: 'absolute', bottom: 90, width: 120 },
+  barTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
+  bar: { height: 3, backgroundColor: colors.teal, borderRadius: 2 },
 });
