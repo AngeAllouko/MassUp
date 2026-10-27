@@ -1,5 +1,5 @@
 // Nutrition values are per 100 g.
-export const CATEGORIES = ['All', 'Meals', 'Protein', 'Grains', 'Vegetables', 'Fruits'];
+export const CATEGORIES = ['All', 'Meals', 'Protein', 'Grains', 'Vegetables', 'Fruits', 'Breakfasts'];
 
 const f = (name, calories, protein, carbs, fat, category, extra = {}) => ({
   name, calories, protein, carbs, fat, category, ...extra,
@@ -7,8 +7,14 @@ const f = (name, calories, protein, carbs, fat, category, extra = {}) => ({
 
 export const FOODS = [
   // New dishes
-  f('Chicken fried rice', 170, 8, 24, 5, 'Meals', { isNew: true }),
-  f('Chicken noodles', 165, 10, 20, 5, 'Meals', { isNew: true }),
+  f('Chicken fried rice', 170, 8, 24, 5, 'Meals'),
+  f('Chicken noodles', 165, 10, 20, 5, 'Meals'),
+
+    // Breakfasts
+  f('Breakfast: bread, butter, banana', 185, 4.9, 31.2, 4.7, 'Breakfasts'),
+  f('Breakfast: bread, butter, banana + 2 boiled eggs', 178, 6.4, 25.6, 5.7, 'Breakfasts'),
+  f('Breakfast: bread, butter, banana + 2 fried eggs', 184, 6.4, 25.4, 6.5, 'Breakfasts'),
+  f('Breakfast: cornflakes, bread, butter, banana', 197, 4.7, 35.4, 4.5, 'Breakfasts'),
 
   // Meals
   f('Attiéké', 148, 1.2, 34, 0.5, 'Meals'),
